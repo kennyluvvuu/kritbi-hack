@@ -1,0 +1,23 @@
+[project]
+name = "kritbi-predictor"
+version = "1.0.0"
+description = "Prophet-based water level forecast microservice for Kacha River"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi==0.115.12",
+    "uvicorn[standard]==0.34.2",
+    "prophet==1.1.6",
+    "cmdstanpy==1.2.4",
+    "pandas==2.2.3",
+    "pydantic==2.11.1",
+    "numpy>=1.24,<2.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "httpx>=0.27",     # needed by fastapi TestClient
+]
+
+[tool.uv]
+package = false

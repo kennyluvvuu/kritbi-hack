@@ -1,0 +1,20 @@
+/* App-specific overrides */
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.disconnected {
+  background: rgba(239, 68, 68, 0.1) !important;
+  border-color: rgba(239, 68, 68, 0.2) !important;
+  color: var(--red-400) !important;
+}
+
+.disconnected .status-dot {
+  background: var(--red-400) !important;
+}
