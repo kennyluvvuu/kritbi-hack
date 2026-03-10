@@ -119,7 +119,7 @@ class WaterLevelPredictor:
         try:
             MODELS_DIR.mkdir(parents=True, exist_ok=True)
             for h in horizons:
-                X, y = build_training_set(df, horizon_days=h // 24)
+                X, y = build_training_set(df, horizon_hours=h)
                 if len(X) < 10:
                     raise ValueError(
                         f"Not enough samples after feature build: {len(X)}"

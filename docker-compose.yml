@@ -66,5 +66,18 @@ services:
     restart: unless-stopped
     volumes:
       - ./predictor/9326_1.csv:/data/9326_1.csv:ro
+
+  bot:
+    build: ./bot
+    environment:
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID}
+      BACKEND_URL: http://backend:3000
+      CRITICAL_LEVEL: 200.0
+      SENSOR_ID: 1
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
 volumes:
   pgdata:
