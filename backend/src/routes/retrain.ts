@@ -75,7 +75,6 @@ async function triggerAutoRetrain(): Promise<void> {
 
 // Start weekly cron after a 60s grace period (let backend fully boot first)
 setTimeout(() => {
-  triggerAutoRetrain();
   setInterval(triggerAutoRetrain, AUTO_RETRAIN_INTERVAL_MS);
 }, 60_000);
 
