@@ -98,8 +98,31 @@ def build_training_set(
     # Target: water level N days into the future
     df["target"] = df["lvl_sm"].shift(-horizon_days)
 
-    features = build_features(df)
-    aligned = df.loc[features.index, "target"]
+    # We need to compute features and align them correctly with the target
+    # Since build_features does a reset_index, we map by date instead.
+    df_features = df.copy()
 
-    mask = aligned.notna()
-    return features[mask].reset_index(drop=True), aligned[mask].reset_index(drop=True)
+    # Lag features
+    for lag in range(1, 8):
+        df_features[f"lvl_lag_{lag}"] = df_features["lvl_sm"].shift(lag)
+
+    # Rolling stats
+    df_features["lvl_roll_mean_7"] = df_features["lvl_sm"].rolling(7, min_periods=4).mean()
+    df_features["lvl_roll_std_3"] = df_features["lvl_sm"].rolling(3, min_periods=2).std().fillna(0)
+
+    # Rate of change (speed of level rise/fall)
+    df_features["level_velocity"] = df_features["lvl_sm"] - df_features["lvl_lag_1"]
+
+    # Date / seasonality features
+    df_features["day_of_year"] = df_features["date"].dt.dayofyear
+    df_features["month"] = df_features["date"].dt.month
+    df_features["day_of_week"] = df_features["date"].dt.dayofweek
+
+    # We must drop rows where any FEATURE_COLS or target is NaN
+    # to avoid training on incomplete data.
+    valid_df = df_features.dropna(subset=FEATURE_COLS + ["target"])
+
+    X = valid_df[FEATURE_COLS].reset_index(drop=True)
+    y = valid_df["target"].reset_index(drop=True)
+
+    return X, y
