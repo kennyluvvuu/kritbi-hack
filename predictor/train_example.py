@@ -106,8 +106,8 @@ def main() -> None:
     df = load_and_normalize(args.dataset)
     logger.info("Dataset range: %s → %s", df['date'].min().date(), df['date'].max().date())
 
-    for horizon_days, horizon_hours in [(1, 24), (2, 48)]:
-        X, y = build_training_set(df, horizon_days=horizon_days)
+    for horizon_hours in [6, 24, 72]:
+        X, y = build_training_set(df, horizon_hours=horizon_hours)
         logger.info("Horizon %dh: %d training samples", horizon_hours, len(X))
 
         split_idx = max(1, len(X) - 365)
