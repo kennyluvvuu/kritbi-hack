@@ -83,7 +83,7 @@ export async function acknowledgeAlert(id: number): Promise<void> {
   await fetch(`${API_BASE}/api/alerts/${id}/acknowledge`, { method: "PATCH" });
 }
 
-export async function requestForecast(sensorId: number, horizonHours = 48): Promise<Forecast> {
+export async function requestForecast(sensorId: number, horizonHours = 72): Promise<Forecast> {
   const resp = await fetch(`${API_BASE}/api/forecast`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

@@ -9,15 +9,15 @@ from pathlib import Path
 from threading import Lock, Thread
 from typing import Optional
 
-import numpy as np
 import pandas as pd
 
 logger = logging.getLogger(__name__)
 
 MODELS_DIR = Path(os.getenv("MODELS_DIR", "/app/models"))
 MODEL_PATHS = {
+    6: MODELS_DIR / "model_6h.cbm",
     24: MODELS_DIR / "model_24h.cbm",
-    48: MODELS_DIR / "model_48h.cbm",
+    72: MODELS_DIR / "model_72h.cbm",
 }
 
 VERSION = "catboost-1.0"
@@ -31,7 +31,7 @@ class RetainStatus:
 
 
 class WaterLevelPredictor:
-    """Loads and manages two CatBoost models (24h and 48h horizons).
+    """Loads and manages CatBoost models (6h, 24h and 72h horizons).
 
     Supports:
     - Lazy loading at startup
@@ -71,7 +71,7 @@ class WaterLevelPredictor:
 
     @property
     def models_loaded(self) -> dict[str, bool]:
-        return {f"{h}h": (h in self._models) for h in [24, 48]}
+        return {f"{h}h": (h in self._models) for h in [6, 24, 72]}
 
     # ─────────────────────────── Predict ───────────────────────────
 
@@ -80,14 +80,14 @@ class WaterLevelPredictor:
 
         Args:
             df: DataFrame with ``FEATURE_COLS`` (output of build_features).
-            horizon: 24, 48, or "all".
+            horizon: 6, 24, 72, or "all".
 
         Returns:
             List of ``{horizon: int, yhat: float}`` dicts.
         """
         from .features import FEATURE_COLS  # noqa: PLC0415
 
-        horizons = [24, 48] if horizon == "all" else [int(horizon)]
+        horizons = [6, 24, 72] if horizon == "all" else [int(horizon)]
         points = []
 
         with self._lock:
@@ -106,7 +106,7 @@ class WaterLevelPredictor:
 
     def retrain_async(self, df: pd.DataFrame, horizon: int | str) -> None:
         """Trigger warm-start retraining in a background thread."""
-        horizons = [24, 48] if horizon == "all" else [int(horizon)]
+        horizons = [6, 24, 72] if horizon == "all" else [int(horizon)]
         thread = Thread(target=self._retrain_worker, args=(df, horizons), daemon=True)
         self.retrain_status.status = "running"
         self.retrain_status.message = f"Retraining model(s): {horizons}"

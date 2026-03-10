@@ -2,7 +2,7 @@
 
 Endpoints:
   GET  /health          — service status, model availability
-  POST /predict         — hourly forecast for 24 or 48 hours
+  POST /predict         — hourly forecast for 6, 24, or 72 hours
   POST /retrain         — warm-start retrain on new IoT data (async)
   GET  /retrain/status  — status of last retrain job
 """
@@ -47,7 +47,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Kritbi — Water Level Predictor (CatBoost)",
-    description="Flood prediction microservice for river Kacha. Forecasts water level at +24h and +48h.",
+    description="Flood prediction microservice for river Kacha. Forecasts water level at +6h, +24h, and +72h.",
     version=VERSION,
     lifespan=lifespan,
 )
@@ -86,7 +86,7 @@ async def predict(req: PredictRequest):
     The first call will fail with 503 if the model files have not been placed
     in ``predictor/models/`` yet. Run ``train_example.py`` to generate them.
     """
-    horizons = [24, 48] if req.horizon == "all" else [int(req.horizon)]
+    horizons = [6, 24, 72] if req.horizon == "all" else [int(req.horizon)]
     for h in horizons:
         if not predictor.models_loaded.get(f"{h}h"):
             raise HTTPException(
