@@ -60,7 +60,7 @@ export function HistoryChart({ readings }: { readings: Reading[] }) {
                 interval="preserveStartEnd"
               />
               <YAxis
-                domain={[0, 600]}
+                domain={[0, 300]}
                 tick={{ fontSize: 11 }}
                 label={{
                   value: "см",
@@ -81,7 +81,7 @@ export function HistoryChart({ readings }: { readings: Reading[] }) {
                 }
               />
               <ReferenceLine
-                y={300}
+                y={150}
                 stroke="#eab308"
                 strokeDasharray="6 4"
                 strokeOpacity={0.5}
@@ -93,7 +93,7 @@ export function HistoryChart({ readings }: { readings: Reading[] }) {
                 }}
               />
               <ReferenceLine
-                y={400}
+                y={200}
                 stroke="#f97316"
                 strokeDasharray="6 4"
                 strokeOpacity={0.5}
@@ -105,7 +105,7 @@ export function HistoryChart({ readings }: { readings: Reading[] }) {
                 }}
               />
               <ReferenceLine
-                y={500}
+                y={250}
                 stroke="#ef4444"
                 strokeDasharray="6 4"
                 strokeOpacity={0.5}

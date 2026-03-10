@@ -71,7 +71,7 @@ async def broadcast_message(text: str):
             logger.error(f"Failed to send message to {chat_id}: {e}")
 
 async def check_predictions_and_alert(manual_chat_id: int | str | None = None):
-    """Fetches new predictions from backend, alerts if ANY predicted value > CRITICAL_LEVEL, or if manually requested."""
+    """Fetches new predictions from backend, alerts if ANY predicted value > CRITICAL_LEVEL."""
     logger.info("Executing periodic flood prediction check...")
     try:
         async with aiohttp.ClientSession() as session:
@@ -151,7 +151,7 @@ async def check_command_handler(message: Message) -> None:
 
 async def main():
     # Setup scheduler for fetching data
-    scheduler.add_job(check_predictions_and_alert, 'interval', hours=1)
+    scheduler.add_job(check_predictions_and_alert, 'interval', seconds=30)
     scheduler.start()
     
     # Run bot

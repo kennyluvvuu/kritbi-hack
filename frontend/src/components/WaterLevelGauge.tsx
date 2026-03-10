@@ -5,7 +5,7 @@ import { formatTime, getLevelStatus } from "../utils/format";
 export function WaterLevelGauge({ reading }: { reading: Reading | null }) {
   const level = reading?.waterLevel ?? 0;
   const status = getLevelStatus(level);
-  const fillPercent = Math.min((level / 600) * 100, 100);
+  const fillPercent = Math.min((level / 300) * 100, 100);
 
   const statusLabels = {
     safe: "Норма",
@@ -52,10 +52,10 @@ export function WaterLevelGauge({ reading }: { reading: Reading | null }) {
         </div>
         <div className="gauge-thresholds">
           <span>0см</span>
-          <span style={{ color: "var(--yellow-400)" }}>300см</span>
-          <span style={{ color: "var(--orange-400)" }}>400см</span>
-          <span style={{ color: "var(--red-400)" }}>500см</span>
-          <span>600см</span>
+          <span style={{ color: "var(--yellow-400)" }}>150см</span>
+          <span style={{ color: "var(--orange-400)" }}>200см</span>
+          <span style={{ color: "var(--red-400)" }}>250см</span>
+          <span>300см</span>
         </div>
         {reading?.temperature != null && (
           <div

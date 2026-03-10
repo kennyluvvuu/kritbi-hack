@@ -5,6 +5,7 @@ import { readingsRoutes } from "./routes/readings";
 import { forecastRoutes } from "./routes/forecast";
 import { sensorsRoutes } from "./routes/sensors";
 import { retrainRoutes } from "./routes/retrain";
+import { chatRoutes } from "./routes/chat";
 import { addClient, removeClient, getClientCount } from "./ws/realtime";
 
 const app = new Elysia()
@@ -46,6 +47,7 @@ const app = new Elysia()
   .use(forecastRoutes)
   .use(sensorsRoutes)
   .use(retrainRoutes)
+  .use(chatRoutes)
   .listen(3000);
 
 console.log(`🌊 Кача API running at http://localhost:${app.server?.port}`);
