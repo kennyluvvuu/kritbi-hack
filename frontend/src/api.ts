@@ -22,16 +22,6 @@ export interface Forecast {
   createdAt: string;
 }
 
-export interface Alert {
-  id: number;
-  sensorId: number;
-  waterLevel: number;
-  type: "warning" | "danger" | "critical";
-  message: string;
-  acknowledged: boolean;
-  createdAt: string;
-}
-
 export interface Sensor {
   id: number;
   name: string;
@@ -71,18 +61,6 @@ export async function fetchLatestReading(): Promise<Reading | null> {
   return json.data;
 }
 
-export async function fetchAlerts(acknowledged?: boolean): Promise<Alert[]> {
-  const params = new URLSearchParams();
-  if (acknowledged !== undefined) params.set("acknowledged", String(acknowledged));
-  const resp = await fetch(`${API_BASE}/api/alerts?${params}`);
-  const json = await resp.json();
-  return json.data;
-}
-
-export async function acknowledgeAlert(id: number): Promise<void> {
-  await fetch(`${API_BASE}/api/alerts/${id}/acknowledge`, { method: "PATCH" });
-}
-
 export async function requestForecast(sensorId: number, horizonHours = 72): Promise<Forecast> {
   const resp = await fetch(`${API_BASE}/api/forecast`, {
     method: "POST",
@@ -116,8 +94,7 @@ export async function fetchSensor(id: number): Promise<Sensor> {
 // ─── WebSocket ──────────────────────────────────────────────
 
 export function createWebSocket(
-  onReading?: (r: Reading) => void,
-  onAlert?: (a: Alert) => void
+  onReading?: (r: Reading) => void
 ): WebSocket {
   // When API_BASE is empty (dev proxy), derive WS URL from current page origin
   let wsUrl: string;
@@ -134,8 +111,6 @@ export function createWebSocket(
       const msg = JSON.parse(event.data);
       if (msg.type === "new_reading" && onReading) {
         onReading(msg.payload);
-      } else if (msg.type === "new_alert" && onAlert) {
-        onAlert(msg.payload);
       }
     } catch {
       // ignore

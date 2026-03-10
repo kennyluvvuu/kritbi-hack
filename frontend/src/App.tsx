@@ -4,7 +4,6 @@ import "./App.css";
 import { useDashboardData } from "./hooks/useDashboardData";
 import { WaterLevelGauge } from "./components/WaterLevelGauge";
 import { StatsCard } from "./components/StatsCard";
-import { AlertPanel } from "./components/AlertPanel";
 import { HistoryChart } from "./components/HistoryChart";
 import { ForecastWidget } from "./components/ForecastWidget";
 
@@ -12,13 +11,11 @@ export default function App() {
   const {
     readings,
     latestReading,
-    alerts,
     forecast,
     forecastLoading,
     connected,
     loadData,
     handleRequestForecast,
-    handleAcknowledge,
   } = useDashboardData();
 
   return (
@@ -44,18 +41,12 @@ export default function App() {
       <div className="dashboard-grid">
         <WaterLevelGauge reading={latestReading} />
         <StatsCard readings={readings} />
-        <AlertPanel
-          alerts={alerts}
-          onAcknowledge={handleAcknowledge}
-          compact
-        />
         <HistoryChart readings={readings} />
         <ForecastWidget
           forecast={forecast}
           onRequest={handleRequestForecast}
           loading={forecastLoading}
         />
-        <AlertPanel alerts={alerts} onAcknowledge={handleAcknowledge} />
       </div>
     </div>
   );

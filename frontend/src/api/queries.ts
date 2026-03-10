@@ -1,5 +1,5 @@
 import { API_BASE } from "./config";
-import type { Reading, Alert, Forecast, Sensor } from "../types";
+import type { Reading, Forecast, Sensor } from "../types";
 
 export async function fetchReadings(
   sensorId?: number,
@@ -22,18 +22,6 @@ export async function fetchLatestReading(): Promise<Reading | null> {
   const resp = await fetch(`${API_BASE}/api/readings/latest`);
   const json = await resp.json();
   return json.data;
-}
-
-export async function fetchAlerts(acknowledged?: boolean): Promise<Alert[]> {
-  const params = new URLSearchParams();
-  if (acknowledged !== undefined) params.set("acknowledged", String(acknowledged));
-  const resp = await fetch(`${API_BASE}/api/alerts?${params}`);
-  const json = await resp.json();
-  return json.data;
-}
-
-export async function acknowledgeAlert(id: number): Promise<void> {
-  await fetch(`${API_BASE}/api/alerts/${id}/acknowledge`, { method: "PATCH" });
 }
 
 export async function requestForecast(sensorId: number, horizonHours = 72): Promise<Forecast> {

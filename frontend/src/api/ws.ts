@@ -1,9 +1,8 @@
 import { API_BASE } from "./config";
-import type { Reading, Alert } from "../types";
+import type { Reading } from "../types";
 
 export function createWebSocket(
-  onReading?: (r: Reading) => void,
-  onAlert?: (a: Alert) => void
+  onReading?: (r: Reading) => void
 ): WebSocket {
   let wsUrl: string;
   if (API_BASE) {
@@ -19,8 +18,6 @@ export function createWebSocket(
       const msg = JSON.parse(event.data);
       if (msg.type === "new_reading" && onReading) {
         onReading(msg.payload);
-      } else if (msg.type === "new_alert" && onAlert) {
-        onAlert(msg.payload);
       }
     } catch {
       // ignore

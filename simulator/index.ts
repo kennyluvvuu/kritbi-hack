@@ -18,6 +18,9 @@ const FORCE_FLOOD = process.env.FORCE_FLOOD === "true";
 
 let floodOffset = 0; // Accumulated flood rise in FORCE_FLOOD mode
 
+// Global cache for historic data by day of year
+const historicalDataByDay = new Map<number, { waterLevel: number, temperature: number, soilMoisture: number }[]>();
+
 // Simulation parameters
 const BASE_LEVEL = 40.0; // Base summer level ~ 40cm
 const SEASONAL_AMPLITUDE = 120.0; // spring flood max ~ +120cm (peaks ~160cm)
@@ -137,9 +140,35 @@ async function ensureSensorExists(): Promise<void> {
 
 async function sendReading(date?: Date): Promise<number> {
   const now = date ?? new Date();
-  const waterLevel = simulateWaterLevel(now);
-  const temperature = simulateTemperature(now);
-  const soilMoisture = simulateSoilMoisture(now);
+  let waterLevel = simulateWaterLevel(now);
+  let temperature = simulateTemperature(now);
+  let soilMoisture = simulateSoilMoisture(now);
+
+  const dayOfYear = getDayOfYear(now);
+  const dayData = historicalDataByDay.get(dayOfYear);
+  
+  if (dayData && dayData.length > 0) {
+    // Pick a random historical record for this day of the year
+    const randIdx = Math.floor(Math.random() * dayData.length);
+    const baseData = dayData[randIdx];
+    
+    // Add random variation 5-10 cm, either positive or negative
+    const sign = Math.random() < 0.5 ? -1 : 1;
+    const variance = (Math.random() * 5 + 5) * sign;
+    
+    if (baseData.waterLevel) {
+        waterLevel = Math.max(10, baseData.waterLevel + variance + floodOffset);
+    }
+    if (baseData.temperature) {
+        temperature = baseData.temperature + (Math.random() * 2 - 1);
+    }
+    if (baseData.soilMoisture) {
+        soilMoisture = baseData.soilMoisture;
+    }
+    
+    waterLevel = Math.round(waterLevel * 10) / 10;
+    temperature = Math.round(temperature * 10) / 10;
+  }
 
   const payload: Record<string, unknown> = {
     sensorId: SENSOR_ID,
@@ -188,13 +217,85 @@ async function main() {
   await ensureSensorExists();
 
   // Send 30 days of daily historical data (CatBoost needs daily granularity)
-  console.log("\n📊 Generating 30 days of daily historical data...");
-  const now = new Date();
-  for (let i = 30; i > 0; i--) {
-    const date = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
-    await sendReading(date);
+  console.log("\n📊 Generating 30 days of daily historical data from CSV...");
+  
+  try {
+    const csvContent = await Bun.file("/data/9326_1.csv").text();
+    const rows = csvContent.split("\n").filter((r: string) => r.trim() !== "");
+    const header = rows[0].split(",");
+    
+    // Parse all rows into historicalDataByDay
+    for (let i = 1; i < rows.length; i++) {
+        const row = rows[i].split(",");
+        if (row.length < 19) continue;
+        const dateParts = row[0].split("-");
+        if (dateParts.length === 3) {
+            const dateObj = new Date(Number(dateParts[0]), Number(dateParts[1]) - 1, Number(dateParts[2]));
+            const dayOfYear = getDayOfYear(dateObj);
+            
+            const data = {
+                waterLevel: Number(row[2]),
+                temperature: Number(row[7]),
+                soilMoisture: Number(row[18])
+            };
+            
+            if (!historicalDataByDay.has(dayOfYear)) {
+                historicalDataByDay.set(dayOfYear, []);
+            }
+            historicalDataByDay.get(dayOfYear)!.push(data);
+        }
+    }
+    
+    // date,gauge_id,lvl_sm,q_cms_s,lvl_mbs,q_mm_day,t_max_e5l,t_max_e5,t_min_e5l,t_min_e5,prcp_e5l,prcp_e5,prcp_gpcp,prcp_imerg,prcp_mswep,Eb,Es,Et,SMsurf,SMroot,Ew,Ei,S,E,Ep
+    
+    // We want the last 30 rows
+    const last30Rows = rows.slice(-30);
+    
+    const now = new Date();
+    // Send oldest first
+    for (let i = 0; i < last30Rows.length; i++) {
+      const row = last30Rows[i].split(",");
+      if (row.length < 19) continue;
+      
+      const waterLevel = Number(row[2]) || simulateWaterLevel(now); // lvl_sm
+      const temperature = Number(row[7]) || simulateTemperature(now); // t_max_e5
+      const soilMoisture = Number(row[18]) || simulateSoilMoisture(now); // SMsurf
+      
+      const daysAgo = 30 - i;
+      const date = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000);
+      
+      const payload: Record<string, unknown> = {
+        sensorId: SENSOR_ID,
+        waterLevel,
+        temperature,
+        soilMoisture,
+        timestamp: date.toISOString(),
+      };
+      
+      try {
+        const resp = await fetch(`${BACKEND_URL}/api/readings`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!resp.ok) {
+          console.error(`❌ API error preload: ${resp.status} ${await resp.text()}`);
+        }
+      } catch (e) {
+          console.error(`❌ Connection error preload: ${(e as Error).message}`);
+      }
+    }
+    console.log("✅ Historical data generated from CSV (30 daily readings)\n");
+  } catch (err) {
+    console.error(`❌ Could not load CSV data, falling back to synthesis: ${(err as Error).message}`);
+    // fallback
+    const now = new Date();
+    for (let i = 30; i > 0; i--) {
+      const date = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+      await sendReading(date);
+    }
+    console.log("✅ Historical data generated (30 daily readings)\n");
   }
-  console.log("✅ Historical data generated (30 daily readings)\n");
 
   // Start real-time simulation with adaptive sampling
   console.log("📡 Starting adaptive real-time simulation...\n");
@@ -203,23 +304,8 @@ async function main() {
   
   // eslint-disable-next-line no-constant-condition
   while (true) {
-    const waterLevel = await sendReading();
-    const velocity = Math.abs(waterLevel - lastWaterLevel);
-    lastWaterLevel = waterLevel;
-
-    // Adaptive Strategy:
-    // Normal mode: INTERVAL_MS (e.g. 5000ms ≈ 1 hour real-time)
-    // Flood threat mode (level > 300cm OR rising > 5cm): 1000ms (≈ 15 mins real-time)
-    let currentDelay = INTERVAL_MS;
-    
-    if (waterLevel >= 300 || velocity >= 5.0) {
-      currentDelay = 1000;
-      console.log("\x1b[35m⚠️ ТРЕВОЖНЫЙ РЕЖИМ:\x1b[0m Адаптивное увеличение частоты замеров (15 мин)");
-    } else {
-      console.log("\x1b[32m✅ ОБЫЧНЫЙ РЕЖИМ:\x1b[0m Стандартная частота замеров (1 час)");
-    }
-
-    await new Promise((r) => setTimeout(r, currentDelay));
+    await sendReading();
+    await new Promise((r) => setTimeout(r, INTERVAL_MS));
   }
 }
 

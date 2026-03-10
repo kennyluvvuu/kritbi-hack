@@ -2,18 +2,15 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import {
   fetchReadings,
   fetchLatestReading,
-  fetchAlerts,
   fetchForecasts,
   requestForecast,
-  acknowledgeAlert,
   createWebSocket,
 } from "../api";
-import type { Reading, Alert, Forecast } from "../types";
+import type { Reading, Forecast } from "../types";
 
 export function useDashboardData() {
   const [readings, setReadings] = useState<Reading[]>([]);
   const [latestReading, setLatestReading] = useState<Reading | null>(null);
-  const [alerts, setAlerts] = useState<Alert[]>([]);
   const [forecast, setForecast] = useState<Forecast | null>(null);
   const [forecastLoading, setForecastLoading] = useState(false);
   const [connected, setConnected] = useState(false);
@@ -22,16 +19,14 @@ export function useDashboardData() {
   // Initial data fetch
   const loadData = useCallback(async () => {
     try {
-      const [readingsData, latestData, alertsData, forecastsData] =
+      const [readingsData, latestData, forecastsData] =
         await Promise.all([
           fetchReadings(1, undefined, undefined, 300),
           fetchLatestReading(),
-          fetchAlerts(),
           fetchForecasts(1),
         ]);
       setReadings(readingsData);
       setLatestReading(latestData);
-      setAlerts(alertsData);
       if (forecastsData.length > 0) {
         setForecast(forecastsData[0]);
       }
@@ -48,9 +43,6 @@ export function useDashboardData() {
       (reading) => {
         setLatestReading(reading);
         setReadings((prev) => [reading, ...prev].slice(0, 500));
-      },
-      (alert) => {
-        setAlerts((prev) => [alert, ...prev]);
       }
     );
 
@@ -86,22 +78,13 @@ export function useDashboardData() {
     }
   };
 
-  const handleAcknowledge = async (id: number) => {
-    await acknowledgeAlert(id);
-    setAlerts((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, acknowledged: true } : a))
-    );
-  };
-
   return {
     readings,
     latestReading,
-    alerts,
     forecast,
     forecastLoading,
     connected,
     loadData,
     handleRequestForecast,
-    handleAcknowledge,
   };
 }

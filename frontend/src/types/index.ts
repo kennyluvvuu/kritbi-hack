@@ -19,16 +19,6 @@ export interface Forecast {
   createdAt: string;
 }
 
-export interface Alert {
-  id: number;
-  sensorId: number;
-  waterLevel: number;
-  type: "warning" | "danger" | "critical";
-  message: string;
-  acknowledged: boolean;
-  createdAt: string;
-}
-
 export interface Sensor {
   id: number;
   name: string;
