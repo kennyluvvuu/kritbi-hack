@@ -3,7 +3,6 @@ import { cors } from "@elysiajs/cors";
 import { swagger } from "@elysiajs/swagger";
 import { readingsRoutes } from "./routes/readings";
 import { forecastRoutes } from "./routes/forecast";
-import { alertsRoutes } from "./routes/alerts";
 import { sensorsRoutes } from "./routes/sensors";
 import { retrainRoutes } from "./routes/retrain";
 import { addClient, removeClient, getClientCount } from "./ws/realtime";
@@ -45,7 +44,6 @@ const app = new Elysia()
   // Routes
   .use(readingsRoutes)
   .use(forecastRoutes)
-  .use(alertsRoutes)
   .use(sensorsRoutes)
   .use(retrainRoutes)
   .listen(3000);

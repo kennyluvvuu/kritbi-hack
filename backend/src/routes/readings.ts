@@ -1,7 +1,7 @@
 import { Elysia, t } from "elysia";
 import { db, schema } from "../db";
 import { eq, desc, and, gte, lte } from "drizzle-orm";
-import { broadcastReading, broadcastAlert } from "../ws/realtime.ts";
+import { broadcastReading } from "../ws/realtime.ts";
 
 export const readingsRoutes = new Elysia({ prefix: "/api/readings" })
     // POST — receive a reading from IoT sensor
@@ -23,42 +23,6 @@ export const readingsRoutes = new Elysia({ prefix: "/api/readings" })
 
             // Broadcast to WebSocket clients
             broadcastReading(reading);
-
-            // Check alert thresholds
-            const [thresholds] = await db
-                .select()
-                .from(schema.alertThresholds)
-                .where(eq(schema.alertThresholds.sensorId, body.sensorId))
-                .limit(1);
-
-            if (thresholds) {
-                let alertType: string | null = null;
-                let message = "";
-
-                if (body.waterLevel >= thresholds.criticalLevel) {
-                    alertType = "critical";
-                    message = `⛔ КРИТИЧЕСКИЙ уровень воды: ${body.waterLevel.toFixed(1)}см (порог: ${thresholds.criticalLevel}см)`;
-                } else if (body.waterLevel >= thresholds.dangerLevel) {
-                    alertType = "danger";
-                    message = `🔴 ОПАСНЫЙ уровень воды: ${body.waterLevel.toFixed(1)}см (порог: ${thresholds.dangerLevel}см)`;
-                } else if (body.waterLevel >= thresholds.warningLevel) {
-                    alertType = "warning";
-                    message = `🟡 Предупреждение: уровень воды ${body.waterLevel.toFixed(1)}см (порог: ${thresholds.warningLevel}см)`;
-                }
-
-                if (alertType) {
-                    const [alert] = await db
-                        .insert(schema.alerts)
-                        .values({
-                            sensorId: body.sensorId,
-                            waterLevel: body.waterLevel,
-                            type: alertType,
-                            message,
-                        })
-                        .returning();
-                    broadcastAlert(alert);
-                }
-            }
 
             return { success: true, reading };
         },
@@ -120,4 +84,10 @@ export const readingsRoutes = new Elysia({ prefix: "/api/readings" })
             .orderBy(desc(schema.readings.timestamp))
             .limit(1);
         return { data: data[0] ?? null };
+    })
+    // DELETE — clear all readings (for presentations/demos)
+    .delete("/clear", async () => {
+        await db.delete(schema.readings);
+        await db.delete(schema.forecasts);
+        return { success: true };
     });

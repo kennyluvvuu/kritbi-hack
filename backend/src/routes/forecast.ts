@@ -82,7 +82,7 @@ export const forecastRoutes = new Elysia({ prefix: "/api/forecast" })
         .values({
           sensorId: body.sensorId,
           forecastData: forecastResult.forecast,
-          horizonHours: 48, // Stores max horizon for compatibility
+          horizonHours: 72, // Stores max horizon for compatibility
         })
         .returning();
 

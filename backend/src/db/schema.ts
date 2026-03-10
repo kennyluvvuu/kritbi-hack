@@ -34,27 +34,3 @@ export const forecasts = pgTable("forecasts", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-// ─── Alert Thresholds ───────────────────────────────────────
-export const alertThresholds = pgTable("alert_thresholds", {
-  id: serial("id").primaryKey(),
-  sensorId: integer("sensor_id")
-    .references(() => sensors.id)
-    .notNull()
-    .unique(),
-  warningLevel: doublePrecision("warning_level").notNull(),
-  dangerLevel: doublePrecision("danger_level").notNull(),
-  criticalLevel: doublePrecision("critical_level").notNull(),
-});
-
-// ─── Alerts ─────────────────────────────────────────────────
-export const alerts = pgTable("alerts", {
-  id: serial("id").primaryKey(),
-  sensorId: integer("sensor_id")
-    .references(() => sensors.id)
-    .notNull(),
-  waterLevel: doublePrecision("water_level").notNull(),
-  type: varchar("type", { length: 50 }).notNull(), // 'warning' | 'danger' | 'critical'
-  message: text("message").notNull(),
-  acknowledged: boolean("acknowledged").default(false).notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
