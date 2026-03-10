@@ -14,10 +14,15 @@ import type { Reading } from "../types";
 import { formatTime, formatDateTime } from "../utils/format";
 
 export function HistoryChart({ readings }: { readings: Reading[] }) {
+  const isMultiDay = readings.length > 1 &&
+    Math.abs(new Date(readings[0].timestamp).getTime() - new Date(readings[readings.length - 1].timestamp).getTime()) > 24 * 60 * 60 * 1000;
+
   const chartData = [...readings]
     .reverse()
     .map((r) => ({
-      time: formatTime(r.timestamp),
+      time: isMultiDay
+        ? new Date(r.timestamp).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })
+        : formatTime(r.timestamp),
       fullTime: formatDateTime(r.timestamp),
       level: r.waterLevel,
       temperature: r.temperature,

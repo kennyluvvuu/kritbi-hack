@@ -84,4 +84,10 @@ export const readingsRoutes = new Elysia({ prefix: "/api/readings" })
             .orderBy(desc(schema.readings.timestamp))
             .limit(1);
         return { data: data[0] ?? null };
+    })
+    // DELETE — clear all readings (for presentations/demos)
+    .delete("/clear", async () => {
+        await db.delete(schema.readings);
+        await db.delete(schema.forecasts);
+        return { success: true };
     });

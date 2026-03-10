@@ -3,7 +3,8 @@
   "module": "index.ts",
   "type": "module",
   "scripts": {
-    "start": "bun run index.ts"
+    "start": "bun run index.ts",
+    "simulate": "bun run simulate_flood.ts ../predictor/9326_1.csv"
   },
   "dependencies": {
     "csv-parse": "^6.1.0"
