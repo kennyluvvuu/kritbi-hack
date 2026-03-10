@@ -50,8 +50,8 @@ export function ForecastWidget({
               {pt6 ? pt6.yhat.toFixed(1) : "—"} <span style={{ fontSize: "1.2rem", opacity: 0.6 }}>см</span>
             </div>
             {pt6 && (
-              <div style={{ marginTop: "10px", fontSize: "0.85rem", color: pt6.yhat >= 400 ? "var(--red-400)" : "var(--green-400)" }}>
-                {pt6.yhat >= 400 ? "⚠️ Высокий уровень" : "✅ В норме"}
+              <div style={{ marginTop: "10px", fontSize: "0.85rem", color: pt6.yhat >= 200 ? "var(--red-400)" : "var(--green-400)" }}>
+                {pt6.yhat >= 200 ? "⚠️ Высокий уровень" : "✅ В норме"}
               </div>
             )}
           </div>
@@ -62,8 +62,8 @@ export function ForecastWidget({
               {pt24 ? pt24.yhat.toFixed(1) : "—"} <span style={{ fontSize: "1.2rem", opacity: 0.6 }}>см</span>
             </div>
             {pt24 && (
-              <div style={{ marginTop: "10px", fontSize: "0.85rem", color: pt24.yhat >= 400 ? "var(--red-400)" : "var(--green-400)" }}>
-                {pt24.yhat >= 400 ? "⚠️ Риск выхода из русла" : "✅ В пределах нормы"}
+              <div style={{ marginTop: "10px", fontSize: "0.85rem", color: pt24.yhat >= 200 ? "var(--red-400)" : "var(--green-400)" }}>
+                {pt24.yhat >= 200 ? "⚠️ Риск выхода из русла" : "✅ В пределах нормы"}
               </div>
             )}
           </div>
@@ -74,8 +74,8 @@ export function ForecastWidget({
               {pt72 ? pt72.yhat.toFixed(1) : "—"} <span style={{ fontSize: "1.2rem", opacity: 0.6 }}>см</span>
             </div>
             {pt72 && (
-               <div style={{ marginTop: "10px", fontSize: "0.85rem", color: pt72.yhat >= 400 ? "var(--red-400)" : "var(--green-400)" }}>
-                 {pt72.yhat >= 400 ? "⚠️ Возможен паводок" : "✅ Стабильная обстановка"}
+               <div style={{ marginTop: "10px", fontSize: "0.85rem", color: pt72.yhat >= 200 ? "var(--red-400)" : "var(--green-400)" }}>
+                 {pt72.yhat >= 200 ? "⚠️ Возможен паводок" : "✅ Стабильная обстановка"}
                </div>
             )}
           </div>

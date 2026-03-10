@@ -25,8 +25,8 @@ export function timeAgo(ts: string): string {
 }
 
 export function getLevelStatus(level: number): "safe" | "warning" | "danger" | "critical" {
-  if (level >= 500) return "critical";
-  if (level >= 400) return "danger";
-  if (level >= 300) return "warning";
+  if (level >= 250) return "critical";
+  if (level >= 200) return "danger";
+  if (level >= 150) return "warning";
   return "safe";
 }
