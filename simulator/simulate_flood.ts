@@ -72,8 +72,9 @@ async function runFloodSimulation() {
     const temperature = Number(row[7]);
     const soilMoisture = Number(row[18]);
     
-    const daysAgo = floodSequence.length - 1 - i;
-    const date = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000);
+    // Use the actual historical date from the CSV so the model's seasonality features work
+    const dateStr = row[0];
+    const date = new Date(dateStr);
     
     const payload = {
       sensorId: SENSOR_ID,
