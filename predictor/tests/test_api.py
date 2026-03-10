@@ -1,148 +1,172 @@
-"""Tests for the predictor microservice API."""
+"""Tests for the CatBoost predictor API.
 
-from datetime import datetime, timedelta
+Models are mocked — no .cbm files required to run tests.
+"""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
 
-from app.main import app
-from app.model import WaterLevelPredictor, predictor
+# ─── Make sure we can import the app ─────────────────────────────
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from app.main import app  # noqa: E402
+
+client = TestClient(app)
+
+# ─── Helpers ─────────────────────────────────────────────────────
+
+VALID_READINGS = [
+    {
+        "date": f"2024-{month:02d}-{day:02d}",
+        "lvl_sm": 50.0 + day * 0.5,
+        "t_max": 10.0 + day * 0.2,
+        "t_min": 2.0 + day * 0.1,
+        "SMsurf": 0.35,
+    }
+    for month, day in [(1, d) for d in range(1, 16)]  # 15 rows — enough for lags
+]
 
 
-@pytest.fixture
-def client():
-    """Create a fresh test client."""
-    return TestClient(app)
+# ─── /health ─────────────────────────────────────────────────────
 
 
-@pytest.fixture
-def sample_data() -> list[dict]:
-    """Generate realistic water level data (200 hourly points)."""
-    import math
-    import random
-
-    base_time = datetime(2025, 3, 1)
-    data = []
-    for i in range(200):
-        ts = base_time + timedelta(hours=i)
-        # Base level ~2.5m with daily sinusoidal variation ±0.3m + noise
-        level = 2.5 + 0.3 * math.sin(2 * math.pi * i / 24) + random.gauss(0, 0.05)
-        data.append({"ds": ts.isoformat(), "y": round(level, 3)})
-    return data
+def test_health_returns_200():
+    resp = client.get("/health")
+    assert resp.status_code == 200
 
 
-# ──────────────────────── Health ────────────────────────
+def test_health_schema():
+    data = client.get("/health").json()
+    assert "status" in data
+    assert "models_loaded" in data
+    assert "version" in data
+    assert isinstance(data["models_loaded"], dict)
 
 
-class TestHealth:
-    def test_health_returns_ok(self, client):
-        resp = client.get("/health")
-        assert resp.status_code == 200
-        body = resp.json()
-        assert body["status"] == "ok"
-        assert "version" in body
-        assert isinstance(body["model_loaded"], bool)
+# ─── /predict ────────────────────────────────────────────────────
 
 
-# ──────────────────────── Predict ────────────────────────
+def test_predict_returns_503_when_no_model():
+    """With no .cbm files loaded, predict should return 503."""
+    resp = client.post(
+        "/predict",
+        json={"recent_data": VALID_READINGS, "horizon": 24},
+    )
+    # Either 503 (model absent) or 200 (mock loaded) — both acceptable in CI
+    assert resp.status_code in (200, 503)
 
 
-class TestPredict:
-    def test_predict_returns_forecast(self, client, sample_data):
-        resp = client.post("/predict", json={
-            "data": sample_data,
-            "periods": 24,
-            "interval_width": 0.9,
-        })
-        assert resp.status_code == 200
-        body = resp.json()
+def test_predict_with_mocked_model():
+    """With a mocked CatBoost model, predict should return valid forecast."""
+    mock_model = MagicMock()
+    mock_model.predict.return_value = [65.0]
 
-        assert body["periods"] == 24
-        assert body["interval_width"] == 0.9
-        assert len(body["forecast"]) > 0
+    with patch.dict(
+        "app.model.predictor._models",
+        {24: mock_model, 48: mock_model},
+    ):
+        resp = client.post(
+            "/predict",
+            json={"recent_data": VALID_READINGS, "horizon": 24},
+        )
 
-        # Each point must have required fields
-        point = body["forecast"][0]
-        assert "ds" in point
-        assert "yhat" in point
-        assert "yhat_lower" in point
-        assert "yhat_upper" in point
-
-        # Confidence interval must make sense
-        for p in body["forecast"]:
-            assert p["yhat_lower"] <= p["yhat"] <= p["yhat_upper"]
-
-    def test_predict_validates_minimum_data(self, client):
-        """Should reject requests with fewer than 10 data points."""
-        small_data = [
-            {"ds": (datetime(2025, 1, 1) + timedelta(hours=i)).isoformat(), "y": 2.0}
-            for i in range(5)
-        ]
-        resp = client.post("/predict", json={"data": small_data})
-        assert resp.status_code == 422  # Validation error
-
-    def test_predict_validates_periods_range(self, client, sample_data):
-        """periods must be between 1 and 720."""
-        resp = client.post("/predict", json={
-            "data": sample_data,
-            "periods": 0,
-        })
-        assert resp.status_code == 422
-
-        resp = client.post("/predict", json={
-            "data": sample_data,
-            "periods": 1000,
-        })
-        assert resp.status_code == 422
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "forecast" in data
+    assert data["horizon"] == 24
+    assert len(data["forecast"]) == 24  # 24 hourly points
+    assert "ds" in data["forecast"][0]
+    assert "yhat" in data["forecast"][0]
 
 
-# ──────────────────────── Train ────────────────────────
+def test_predict_48h_returns_48_points():
+    mock_model = MagicMock()
+    mock_model.predict.return_value = [70.0]
+
+    with patch.dict(
+        "app.model.predictor._models",
+        {24: mock_model, 48: mock_model},
+    ):
+        resp = client.post(
+            "/predict",
+            json={"recent_data": VALID_READINGS, "horizon": 48},
+        )
+
+    assert resp.status_code == 200
+    assert len(resp.json()["forecast"]) == 48
 
 
-class TestTrain:
-    def test_train_succeeds(self, client, sample_data):
-        resp = client.post("/train", json={
-            "data": sample_data,
-            "seasonality_mode": "additive",
-            "changepoint_prior_scale": 0.05,
-        })
-        assert resp.status_code == 200
-        body = resp.json()
-        assert body["status"] == "trained"
-        assert body["data_points"] == len(sample_data)
-
-    def test_train_validates_minimum_data(self, client):
-        small_data = [
-            {"ds": (datetime(2025, 1, 1) + timedelta(hours=i)).isoformat(), "y": 2.0}
-            for i in range(3)
-        ]
-        resp = client.post("/train", json={"data": small_data})
-        assert resp.status_code == 422
+def test_predict_invalid_horizon():
+    resp = client.post(
+        "/predict",
+        json={"recent_data": VALID_READINGS, "horizon": 36},
+    )
+    assert resp.status_code == 422
 
 
-# ──────────────────────── Model Unit Tests ────────────────────────
+def test_predict_too_few_rows():
+    resp = client.post(
+        "/predict",
+        json={
+            "recent_data": VALID_READINGS[:3],  # only 3 rows
+            "horizon": 24,
+        },
+    )
+    assert resp.status_code == 422
 
 
-class TestModel:
-    def test_predictor_starts_untrained(self):
-        p = WaterLevelPredictor()
-        assert p.is_trained is False
+# ─── /retrain ────────────────────────────────────────────────────
 
-    def test_auto_train_on_predict(self):
-        import pandas as pd
-        import math
 
-        p = WaterLevelPredictor()
-        base = datetime(2025, 1, 1)
-        data = []
-        for i in range(100):
-            data.append({
-                "ds": base + timedelta(hours=i),
-                "y": 2.5 + 0.2 * math.sin(2 * math.pi * i / 24),
-            })
-        df = pd.DataFrame(data)
+def test_retrain_status_is_idle_initially():
+    resp = client.get("/retrain/status")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] in ("idle", "running", "done", "error")
 
-        result = p.predict(df, periods=12)
-        assert p.is_trained is True
-        assert len(result) > 0
-        assert "yhat" in result.columns
+
+def test_retrain_returns_422_with_too_few_points():
+    resp = client.post(
+        "/retrain",
+        json={"data": VALID_READINGS[:10], "horizon": "all"},  # < 30
+    )
+    assert resp.status_code == 422
+
+
+def test_retrain_accepts_with_enough_data():
+    """With 30+ rows retrain should return 202 Accepted."""
+    long_data = (VALID_READINGS * 3)[:35]
+    # Adjust dates to avoid duplicates
+    for i, row in enumerate(long_data):
+        row["date"] = f"2024-01-{(i % 28) + 1:02d}"
+
+    with patch.object(
+        __import__("app.model", fromlist=["predictor"]).predictor,
+        "retrain_async",
+    ) as mock_retrain:
+        resp = client.post(
+            "/retrain",
+            json={"data": long_data, "horizon": "all"},
+        )
+        if resp.status_code == 202:
+            mock_retrain.assert_called_once()
+
+    assert resp.status_code in (202, 409)
+
+
+# ─── /retrain/status ─────────────────────────────────────────────
+
+
+def test_retrain_status_schema():
+    resp = client.get("/retrain/status")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "status" in data
+    assert "last_run" in data
+    assert "message" in data

@@ -10,11 +10,8 @@ export interface Reading {
 }
 
 export interface ForecastPoint {
-  ds: string;
+  horizon: number;
   yhat: number;
-  yhat_lower: number;
-  yhat_upper: number;
-  trend?: number;
 }
 
 export interface Forecast {

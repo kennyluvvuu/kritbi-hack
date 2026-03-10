@@ -2,28 +2,23 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# System deps for CmdStan compilation
+# CatBoost requires libgomp for OpenMP (Linux only, zero compilation needed)
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        build-essential \
-        gcc \
-        g++ \
-        libgomp1 \
-        curl && \
+    apt-get install -y --no-install-recommends libgomp1 && \
     rm -rf /var/lib/apt/lists/*
 
-# Install uv
+# Install uv for fast dependency management
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
 
-# Copy dependency spec and install (without project itself)
+# Install dependencies first (layer cache)
 COPY pyproject.toml .
 RUN uv sync --no-install-project
 
-# Install CmdStan via cmdstanpy (required by Prophet's Stan backend)
-RUN uv run python -c "import cmdstanpy; cmdstanpy.install_cmdstan(progress=False)"
-
 # Copy application code
 COPY . .
+
+# Model files land here at runtime (mounted or copied during build)
+RUN mkdir -p /app/models
 
 EXPOSE 8000
 

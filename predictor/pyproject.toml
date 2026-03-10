@@ -1,23 +1,24 @@
 [project]
-name = "kritbi-predictor"
+name = "predictor"
 version = "1.0.0"
-description = "Prophet-based water level forecast microservice for Kacha River"
+description = "CatBoost water level prediction microservice for river Kacha"
 requires-python = ">=3.11"
 dependencies = [
-    "fastapi==0.115.12",
-    "uvicorn[standard]==0.34.2",
-    "prophet==1.1.6",
-    "cmdstanpy==1.2.4",
-    "pandas==2.2.3",
-    "pydantic==2.11.1",
-    "numpy>=1.24,<2.1",
+    "catboost>=1.2",
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "pandas>=2.0",
+    "pydantic>=2.0",
+    "numpy>=1.26",
+    "scikit-learn>=1.0",
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
     "pytest>=8.0",
-    "httpx>=0.27",     # needed by fastapi TestClient
+    "httpx>=0.27",
+    "pytest-asyncio>=0.23",
 ]
 
-[tool.uv]
-package = false
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

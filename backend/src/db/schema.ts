@@ -19,6 +19,7 @@ export const readings = pgTable("readings", {
     .notNull(),
   waterLevel: doublePrecision("water_level").notNull(),
   temperature: doublePrecision("temperature"),
+  soilMoisture: doublePrecision("soil_moisture"),
   timestamp: timestamp("timestamp").defaultNow().notNull(),
 });
 

@@ -2,65 +2,78 @@ import { Elysia, t } from "elysia";
 import { db, schema } from "../db";
 import { eq, desc } from "drizzle-orm";
 
-const PREDICTOR_URL = process.env.PREDICTOR_URL || "http://localhost:8000";
+const PREDICTOR_URL = process.env.PREDICTOR_URL || "http://predictor:8000";
 
 export const forecastRoutes = new Elysia({ prefix: "/api/forecast" })
   // POST — request a new forecast
   .post(
     "/",
     async ({ body }) => {
-      // Fetch historical data for this sensor
-      const historicalData = await db
+      // Fetch last 1000 readings to have enough for 30 daily snapshots
+      const rawHistory = await db
         .select({
           timestamp: schema.readings.timestamp,
           waterLevel: schema.readings.waterLevel,
+          temperature: schema.readings.temperature,
+          soilMoisture: schema.readings.soilMoisture,
         })
         .from(schema.readings)
         .where(eq(schema.readings.sensorId, body.sensorId))
-        .orderBy(schema.readings.timestamp)
-        .limit(2000);
+        .orderBy(desc(schema.readings.timestamp))
+        .limit(1000);
 
-      if (historicalData.length < 10) {
+      // Filter to get the MOST RECENT reading for each of the last 30 distinct days
+      const dailyPoints: typeof rawHistory = [];
+      const seenDays = new Set<string>();
+
+      for (const r of rawHistory) {
+        const dayKey = r.timestamp.toISOString().split("T")[0];
+        if (dayKey && !seenDays.has(dayKey)) {
+          dailyPoints.push(r);
+          seenDays.add(dayKey);
+        }
+        if (dailyPoints.length >= 30) break;
+      }
+
+      const historicalData = dailyPoints;
+
+      if (historicalData.length < 8) {
         return {
           success: false,
-          error: "Недостаточно данных для прогноза (минимум 10 записей)",
+          error:
+            "Недостаточно данных для прогноза (минимум 8 дневных записей)",
         };
       }
 
-      // Format for Prophet: { ds: "YYYY-MM-DD HH:mm:ss", y: number }
-      const prophetData = historicalData.map((r) => ({
-        ds: r.timestamp.toISOString(),
-        y: r.waterLevel,
+      // Sort ascending for feature building (oldest first)
+      const sorted = [...historicalData].reverse();
+
+      // Format for CatBoost predictor
+      const recentData = sorted.map((r) => ({
+        date: r.timestamp.toISOString().split("T")[0],
+        lvl_sm: r.waterLevel,
+        t_max: r.temperature ?? 10,
+        t_min: r.temperature ? r.temperature - 5 : 5,
+        SMsurf: r.soilMoisture ?? 0.2,
       }));
 
-      const periods = body.horizonHours || 48;
 
-      // Call Prophet microservice — aligned with predictor's PredictRequest schema
+
+      // Call CatBoost microservice to get point forecasts
       const response = await fetch(`${PREDICTOR_URL}/predict`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          data: prophetData,
-          periods,
-          interval_width: 0.95,
-        }),
+        body: JSON.stringify({ recent_data: recentData, horizon: "all" }),
       });
 
       if (!response.ok) {
         const err = await response.text();
-        return { success: false, error: `Prophet error: ${err}` };
+        return { success: false, error: `Predictor error: ${err}` };
       }
 
       const forecastResult = (await response.json()) as {
-        forecast: Array<{
-          ds: string;
-          yhat: number;
-          yhat_lower: number;
-          yhat_upper: number;
-          trend?: number;
-        }>;
-        periods: number;
-        interval_width: number;
+        forecast: Array<{ horizon: number; yhat: number }>;
+        model_version: string;
       };
 
       // Save forecast to DB
@@ -69,7 +82,7 @@ export const forecastRoutes = new Elysia({ prefix: "/api/forecast" })
         .values({
           sensorId: body.sensorId,
           forecastData: forecastResult.forecast,
-          horizonHours: periods,
+          horizonHours: 48, // Stores max horizon for compatibility
         })
         .returning();
 
@@ -78,7 +91,6 @@ export const forecastRoutes = new Elysia({ prefix: "/api/forecast" })
     {
       body: t.Object({
         sensorId: t.Number(),
-        horizonHours: t.Optional(t.Number()),
       }),
     }
   )

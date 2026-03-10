@@ -1,8 +1,13 @@
-"""Water Level Prediction Microservice.
+"""CatBoost Water Level Predictor — FastAPI application.
 
-FastAPI application wrapping Facebook Prophet to forecast river
-water levels based on historical sensor readings.
+Endpoints:
+  GET  /health          — service status, model availability
+  POST /predict         — hourly forecast for 24 or 48 hours
+  POST /retrain         — warm-start retrain on new IoT data (async)
+  GET  /retrain/status  — status of last retrain job
 """
+
+from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
@@ -11,14 +16,16 @@ import pandas as pd
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
+from .features import build_features
 from .model import predictor
 from .schemas import (
+    ForecastPoint,
     HealthResponse,
     PredictRequest,
     PredictResponse,
-    ForecastPoint,
-    TrainRequest,
-    TrainResponse,
+    RetrainRequest,
+    RetrainResponse,
+    RetrainStatusResponse,
 )
 
 logging.basicConfig(
@@ -32,14 +39,15 @@ VERSION = "1.0.0"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("🚀 Predictor service v%s starting up", VERSION)
+    logger.info("🚀 CatBoost predictor v%s starting up", VERSION)
+    logger.info("Models loaded: %s", predictor.models_loaded)
     yield
-    logger.info("🛑 Predictor service shutting down")
+    logger.info("🛑 Predictor shutting down")
 
 
 app = FastAPI(
-    title="Kritbi — Water Level Predictor",
-    description="Prophet-based forecast microservice for river Kacha flood prediction system",
+    title="Kritbi — Water Level Predictor (CatBoost)",
+    description="Flood prediction microservice for river Kacha. Forecasts water level at +24h and +48h.",
     version=VERSION,
     lifespan=lifespan,
 )
@@ -52,90 +60,102 @@ app.add_middleware(
 )
 
 
-# ───────────────────────────── endpoints ─────────────────────────────
+# ─────────────────────────── /health ───────────────────────────
 
 
 @app.get("/health", response_model=HealthResponse, tags=["system"])
-async def health_check():
-    """Service health check."""
+async def health():
+    """Service liveness + model availability check."""
     return HealthResponse(
         status="ok",
-        model_loaded=predictor.is_trained,
+        models_loaded=predictor.models_loaded,
         version=VERSION,
     )
 
 
+# ─────────────────────────── /predict ───────────────────────────
+
+
 @app.post("/predict", response_model=PredictResponse, tags=["prediction"])
 async def predict(req: PredictRequest):
-    """Generate a water level forecast.
+    """Generate an hourly water level forecast.
 
-    Accepts historical observations and returns a forecast for the
-    requested number of hours with confidence intervals.
+    Send the last **8+ days** of daily sensor readings (water level, temperature,
+    soil moisture). Returns ``horizon`` hourly forecast points.
 
-    If the model has not been trained via ``/train``, it will be
-    auto-fitted on the incoming data.
+    The first call will fail with 503 if the model files have not been placed
+    in ``predictor/models/`` yet. Run ``train_example.py`` to generate them.
     """
-    try:
-        df = pd.DataFrame([{"ds": p.ds, "y": p.y} for p in req.data])
-        df["ds"] = pd.to_datetime(df["ds"], utc=True).dt.tz_localize(None)
-        df = df.sort_values("ds").reset_index(drop=True)
-
-        forecast_df = predictor.predict(
-            df,
-            periods=req.periods,
-            interval_width=req.interval_width,
-        )
-
-        forecast_points = [
-            ForecastPoint(
-                ds=row["ds"],
-                yhat=round(row["yhat"], 4),
-                yhat_lower=round(row["yhat_lower"], 4),
-                yhat_upper=round(row["yhat_upper"], 4),
-                trend=round(row["trend"], 4) if pd.notna(row.get("trend")) else None,
+    horizons = [24, 48] if req.horizon == "all" else [int(req.horizon)]
+    for h in horizons:
+        if not predictor.models_loaded.get(f"{h}h"):
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    f"Model for {h}h not loaded. "
+                    "Run train_example.py and place model_Xh.cbm in predictor/models/."
+                ),
             )
-            for _, row in forecast_df.iterrows()
-        ]
+
+    try:
+        raw = pd.DataFrame([r.model_dump() for r in req.recent_data])
+        features_df = build_features(raw)
+
+        if features_df.empty:
+            raise HTTPException(
+                status_code=422,
+                detail="Not enough data to build features after lag computation (need ≥ 8 rows).",
+            )
+
+        points = predictor.predict(features_df, horizon=req.horizon)
 
         return PredictResponse(
-            forecast=forecast_points,
-            periods=req.periods,
-            interval_width=req.interval_width,
-            model_info={"auto_trained": not predictor.is_trained or True},
+            forecast=[ForecastPoint(horizon=p["horizon"], yhat=p["yhat"]) for p in points],
+            model_version=f"catboost-v1.0",
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.exception("Prediction failed")
+        logger.exception("Prediction error")
         raise HTTPException(status_code=500, detail=f"Prediction error: {e}")
 
 
-@app.post("/train", response_model=TrainResponse, tags=["training"])
-async def train(req: TrainRequest):
-    """Train (or retrain) the Prophet model on fresh data.
+# ─────────────────────────── /retrain ───────────────────────────
 
-    This replaces the current model entirely. Use when a significant
-    amount of new data has been collected and you want to improve
-    forecast accuracy.
+
+@app.post("/retrain", response_model=RetrainResponse, status_code=202, tags=["training"])
+async def retrain(req: RetrainRequest):
+    """Trigger warm-start retraining on new IoT sensor data.
+
+    Retraining runs in the background and returns **202 Accepted** immediately.
+    Check progress via ``GET /retrain/status``.
+
+    The existing model weights are preserved via CatBoost ``init_model`` —
+    12 years of ERA5 knowledge is kept and adapted to the new readings.
+
+    Minimum **30 data points** required for meaningful retraining.
     """
-    try:
-        df = pd.DataFrame([{"ds": p.ds, "y": p.y} for p in req.data])
-        df["ds"] = pd.to_datetime(df["ds"], utc=True).dt.tz_localize(None)
-        df = df.sort_values("ds").reset_index(drop=True)
+    if predictor.retrain_status.status == "running":
+        raise HTTPException(status_code=409, detail="Retraining already in progress.")
 
-        info = predictor.train(
-            df,
-            seasonality_mode=req.seasonality_mode,
-            changepoint_prior_scale=req.changepoint_prior_scale,
-        )
+    df = pd.DataFrame([r.model_dump() for r in req.data])
 
-        return TrainResponse(
-            status="trained",
-            data_points=info["data_points"],
-            message=f"Model trained on {info['data_points']} data points "
-                    f"(seasonality={info['seasonality_mode']}, "
-                    f"cp_scale={info['changepoint_prior_scale']})",
-        )
+    predictor.retrain_async(df, horizon=req.horizon)
 
-    except Exception as e:
-        logger.exception("Training failed")
-        raise HTTPException(status_code=500, detail=f"Training error: {e}")
+    return RetrainResponse(
+        status="accepted",
+        data_points=len(df),
+        message=f"Warm-start retraining started for horizon={req.horizon} on {len(df)} samples.",
+    )
+
+
+@app.get("/retrain/status", response_model=RetrainStatusResponse, tags=["training"])
+async def retrain_status():
+    """Check the status of the last retrain job."""
+    s = predictor.retrain_status
+    return RetrainStatusResponse(
+        status=s.status,
+        last_run=s.last_run,
+        message=s.message,
+    )

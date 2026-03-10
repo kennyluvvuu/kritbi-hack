@@ -14,6 +14,7 @@ export const readingsRoutes = new Elysia({ prefix: "/api/readings" })
                     sensorId: body.sensorId,
                     waterLevel: body.waterLevel,
                     temperature: body.temperature ?? null,
+                    soilMoisture: body.soilMoisture ?? null,
                     timestamp: body.timestamp
                         ? new Date(body.timestamp)
                         : new Date(),
@@ -36,13 +37,13 @@ export const readingsRoutes = new Elysia({ prefix: "/api/readings" })
 
                 if (body.waterLevel >= thresholds.criticalLevel) {
                     alertType = "critical";
-                    message = `⛔ КРИТИЧЕСКИЙ уровень воды: ${body.waterLevel.toFixed(2)}м (порог: ${thresholds.criticalLevel}м)`;
+                    message = `⛔ КРИТИЧЕСКИЙ уровень воды: ${body.waterLevel.toFixed(1)}см (порог: ${thresholds.criticalLevel}см)`;
                 } else if (body.waterLevel >= thresholds.dangerLevel) {
                     alertType = "danger";
-                    message = `🔴 ОПАСНЫЙ уровень воды: ${body.waterLevel.toFixed(2)}м (порог: ${thresholds.dangerLevel}м)`;
+                    message = `🔴 ОПАСНЫЙ уровень воды: ${body.waterLevel.toFixed(1)}см (порог: ${thresholds.dangerLevel}см)`;
                 } else if (body.waterLevel >= thresholds.warningLevel) {
                     alertType = "warning";
-                    message = `🟡 Предупреждение: уровень воды ${body.waterLevel.toFixed(2)}м (порог: ${thresholds.warningLevel}м)`;
+                    message = `🟡 Предупреждение: уровень воды ${body.waterLevel.toFixed(1)}см (порог: ${thresholds.warningLevel}см)`;
                 }
 
                 if (alertType) {
@@ -66,6 +67,7 @@ export const readingsRoutes = new Elysia({ prefix: "/api/readings" })
                 sensorId: t.Number(),
                 waterLevel: t.Number(),
                 temperature: t.Optional(t.Number()),
+                soilMoisture: t.Optional(t.Number()),
                 timestamp: t.Optional(t.String()),
             }),
         },

@@ -27,9 +27,9 @@ export const sensorsRoutes = new Elysia({ prefix: "/api/sensors" })
       // Create default thresholds
       await db.insert(schema.alertThresholds).values({
         sensorId: sensor.id,
-        warningLevel: Number(process.env.WARNING_LEVEL) || 3.0,
-        dangerLevel: Number(process.env.DANGER_LEVEL) || 4.0,
-        criticalLevel: Number(process.env.CRITICAL_LEVEL) || 5.0,
+        warningLevel: Number(process.env.WARNING_LEVEL) || 300.0,
+        dangerLevel: Number(process.env.DANGER_LEVEL) || 400.0,
+        criticalLevel: Number(process.env.CRITICAL_LEVEL) || 500.0,
       });
 
       return { success: true, sensor };

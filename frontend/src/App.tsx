@@ -19,7 +19,6 @@ import {
   Tooltip,
   ResponsiveContainer,
   ReferenceLine,
-  Legend,
   ComposedChart,
 } from "recharts";
 import {
@@ -64,9 +63,9 @@ function timeAgo(ts: string): string {
 }
 
 function getLevelStatus(level: number): "safe" | "warning" | "danger" | "critical" {
-  if (level >= 5.0) return "critical";
-  if (level >= 4.0) return "danger";
-  if (level >= 3.0) return "warning";
+  if (level >= 500) return "critical";
+  if (level >= 400) return "danger";
+  if (level >= 300) return "warning";
   return "safe";
 }
 
@@ -75,7 +74,7 @@ function getLevelStatus(level: number): "safe" | "warning" | "danger" | "critica
 function WaterLevelGauge({ reading }: { reading: Reading | null }) {
   const level = reading?.waterLevel ?? 0;
   const status = getLevelStatus(level);
-  const fillPercent = Math.min((level / 6) * 100, 100);
+  const fillPercent = Math.min((level / 600) * 100, 100);
 
   const statusLabels = {
     safe: "Норма",
@@ -98,8 +97,8 @@ function WaterLevelGauge({ reading }: { reading: Reading | null }) {
       </div>
       <div className="gauge-container">
         <div className={`gauge-value ${status}`}>
-          {level.toFixed(2)}
-          <span style={{ fontSize: "1.5rem", marginLeft: "4px", opacity: 0.6 }}>м</span>
+          {level.toFixed(1)}
+          <span style={{ fontSize: "1.5rem", marginLeft: "4px", opacity: 0.6 }}>см</span>
         </div>
         <div
           className="gauge-label"
@@ -121,11 +120,11 @@ function WaterLevelGauge({ reading }: { reading: Reading | null }) {
           />
         </div>
         <div className="gauge-thresholds">
-          <span>0м</span>
-          <span style={{ color: "var(--yellow-400)" }}>3м</span>
-          <span style={{ color: "var(--orange-400)" }}>4м</span>
-          <span style={{ color: "var(--red-400)" }}>5м</span>
-          <span>6м</span>
+          <span>0см</span>
+          <span style={{ color: "var(--yellow-400)" }}>300см</span>
+          <span style={{ color: "var(--orange-400)" }}>400см</span>
+          <span style={{ color: "var(--red-400)" }}>500см</span>
+          <span>600см</span>
         </div>
         {reading?.temperature != null && (
           <div
@@ -190,19 +189,19 @@ function StatsCard({ readings }: { readings: Reading[] }) {
       <div className="stats-grid">
         <div className="stat-item">
           <div className="stat-value" style={{ color: "var(--red-400)" }}>
-            {max.toFixed(2)}м
+            {max.toFixed(1)}см
           </div>
           <div className="stat-label">Максимум</div>
         </div>
         <div className="stat-item">
           <div className="stat-value" style={{ color: "var(--green-400)" }}>
-            {min.toFixed(2)}м
+            {min.toFixed(1)}см
           </div>
           <div className="stat-label">Минимум</div>
         </div>
         <div className="stat-item">
           <div className="stat-value" style={{ color: "var(--blue-400)" }}>
-            {avg.toFixed(2)}м
+            {avg.toFixed(1)}см
           </div>
           <div className="stat-label">Среднее</div>
         </div>
@@ -267,10 +266,10 @@ function HistoryChart({ readings }: { readings: Reading[] }) {
                 interval="preserveStartEnd"
               />
               <YAxis
-                domain={[0, 6]}
+                domain={[0, 600]}
                 tick={{ fontSize: 11 }}
                 label={{
-                  value: "м",
+                  value: "см",
                   position: "insideTopLeft",
                   style: { fill: "#64748b", fontSize: 11 },
                 }}
@@ -288,7 +287,7 @@ function HistoryChart({ readings }: { readings: Reading[] }) {
                 }
               />
               <ReferenceLine
-                y={3}
+                y={300}
                 stroke="#eab308"
                 strokeDasharray="6 4"
                 strokeOpacity={0.5}
@@ -300,7 +299,7 @@ function HistoryChart({ readings }: { readings: Reading[] }) {
                 }}
               />
               <ReferenceLine
-                y={4}
+                y={400}
                 stroke="#f97316"
                 strokeDasharray="6 4"
                 strokeOpacity={0.5}
@@ -312,7 +311,7 @@ function HistoryChart({ readings }: { readings: Reading[] }) {
                 }}
               />
               <ReferenceLine
-                y={5}
+                y={500}
                 stroke="#ef4444"
                 strokeDasharray="6 4"
                 strokeOpacity={0.5}
@@ -335,7 +334,7 @@ function HistoryChart({ readings }: { readings: Reading[] }) {
                 stroke="#3b82f6"
                 strokeWidth={2}
                 dot={false}
-                name="Уровень (м)"
+                name="Уровень (см)"
                 activeDot={{
                   r: 5,
                   fill: "#3b82f6",
@@ -351,56 +350,27 @@ function HistoryChart({ readings }: { readings: Reading[] }) {
   );
 }
 
-// ─── Forecast Chart ─────────────────────────────────────
+// ─── Forecast Widget (Weather Style) ──────────────────────
 
-function ForecastChart({
+function ForecastWidget({
   forecast,
-  readings,
   onRequest,
   loading,
 }: {
   forecast: Forecast | null;
-  readings: Reading[];
   onRequest: () => void;
   loading: boolean;
 }) {
-  const chartData: Array<{
-    time: string;
-    actual?: number;
-    yhat?: number;
-    yhat_lower?: number;
-    yhat_upper?: number;
-    interval?: [number, number];
-  }> = [];
-
-  // Historical data (last 48 points)
-  const recentReadings = [...readings].reverse().slice(-48);
-  for (const r of recentReadings) {
-    chartData.push({
-      time: formatDateTime(r.timestamp),
-      actual: r.waterLevel,
-    });
-  }
-
-  // Forecast data
-  if (forecast?.forecastData) {
-    const points = forecast.forecastData as ForecastPoint[];
-    for (const p of points) {
-      chartData.push({
-        time: formatDateTime(p.ds),
-        yhat: p.yhat,
-        yhat_lower: p.yhat_lower,
-        yhat_upper: p.yhat_upper,
-        interval: [p.yhat_lower, p.yhat_upper],
-      });
-    }
-  }
+  const points = (forecast?.forecastData as ForecastPoint[]) || [];
+  
+  const pt24 = points.find((p) => p.horizon === 24);
+  const pt48 = points.find((p) => p.horizon === 48);
 
   return (
-    <div className="card card-forecast">
+    <div className="card card-forecast" style={{ gridColumn: "span 2" }}>
       <div className="card-header">
         <div className="card-title">
-          <TrendingUp size={16} /> Прогноз (Prophet)
+          <TrendingUp size={16} /> Прогноз уровня воды (CatBoost)
         </div>
         <button
           className="btn btn-primary"
@@ -412,88 +382,45 @@ function ForecastChart({
           ) : (
             <TrendingUp size={14} />
           )}
-          {loading ? "Расчёт..." : "Рассчитать прогноз"}
+          {loading ? "Расчёт..." : "Обновить прогноз"}
         </button>
       </div>
-      {chartData.length === 0 ? (
+      
+      {!forecast ? (
         <div className="empty-state">
           <TrendingUp size={40} />
-          <span>Нажмите «Рассчитать прогноз» для получения предсказания</span>
-          <span style={{ fontSize: "0.75rem" }}>
-            Необходимо минимум 10 записей уровня воды
-          </span>
+          <span>Свежего прогноза нет. Нажмите «Обновить прогноз»</span>
         </div>
       ) : (
-        <div className="chart-container">
-          <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart
-              data={chartData}
-              margin={{ top: 5, right: 20, bottom: 5, left: 0 }}
-            >
-              <defs>
-                <linearGradient id="forecastGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#c084fc" stopOpacity={0.15} />
-                  <stop offset="100%" stopColor="#c084fc" stopOpacity={0.02} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis
-                dataKey="time"
-                tick={{ fontSize: 10 }}
-                interval="preserveStartEnd"
-              />
-              <YAxis
-                domain={[0, "auto"]}
-                tick={{ fontSize: 11 }}
-              />
-              <Tooltip
-                contentStyle={{
-                  background: "rgba(17, 24, 39, 0.95)",
-                  border: "1px solid rgba(255,255,255,0.1)",
-                  borderRadius: "10px",
-                  color: "#f1f5f9",
-                  fontSize: "0.8rem",
-                }}
-              />
-              <Legend
-                wrapperStyle={{ fontSize: "0.75rem", color: "#94a3b8" }}
-              />
-              <ReferenceLine y={3} stroke="#eab308" strokeDasharray="6 4" strokeOpacity={0.4} />
-              <ReferenceLine y={4} stroke="#f97316" strokeDasharray="6 4" strokeOpacity={0.4} />
-              <ReferenceLine y={5} stroke="#ef4444" strokeDasharray="6 4" strokeOpacity={0.4} />
-              {forecast && (
-                <Area
-                  type="monotone"
-                  dataKey="interval"
-                  fill="url(#forecastGrad)"
-                  stroke="none"
-                  name="Довер. интервал"
-                  legendType="none"
-                />
-              )}
-              <Line
-                type="monotone"
-                dataKey="actual"
-                stroke="#3b82f6"
-                strokeWidth={2}
-                dot={false}
-                name="Факт"
-                connectNulls={false}
-              />
-              {forecast && (
-                <Line
-                  type="monotone"
-                  dataKey="yhat"
-                  stroke="#c084fc"
-                  strokeWidth={2}
-                  strokeDasharray="6 3"
-                  dot={false}
-                  name="Прогноз"
-                  connectNulls={false}
-                />
-              )}
-            </ComposedChart>
-          </ResponsiveContainer>
+        <div style={{ display: "flex", gap: "20px", marginTop: "10px", flexWrap: "wrap" }}>
+          <div className="forecast-card" style={{ flex: 1, background: "var(--card-bg-alt)", padding: "20px", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.05)" }}>
+            <div style={{ fontSize: "0.9rem", color: "var(--text-muted)", marginBottom: "8px" }}>Завтра (+24 часа)</div>
+            <div style={{ fontSize: "2.5rem", fontWeight: 700, color: "var(--cyan-400)" }}>
+              {pt24 ? pt24.yhat.toFixed(1) : "—"} <span style={{ fontSize: "1.2rem", opacity: 0.6 }}>см</span>
+            </div>
+            {pt24 && (
+              <div style={{ marginTop: "10px", fontSize: "0.85rem", color: pt24.yhat >= 400 ? "var(--red-400)" : "var(--green-400)" }}>
+                {pt24.yhat >= 400 ? "⚠️ Высокий уровень" : "✅ В пределах нормы"}
+              </div>
+            )}
+          </div>
+
+          <div className="forecast-card" style={{ flex: 1, background: "var(--card-bg-alt)", padding: "20px", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.05)" }}>
+            <div style={{ fontSize: "0.9rem", color: "var(--text-muted)", marginBottom: "8px" }}>Послезавтра (+48 часов)</div>
+            <div style={{ fontSize: "2.2rem", fontWeight: 700, color: "var(--blue-400)" }}>
+              {pt48 ? pt48.yhat.toFixed(1) : "—"} <span style={{ fontSize: "1.2rem", opacity: 0.6 }}>см</span>
+            </div>
+            {pt48 && (
+               <div style={{ marginTop: "10px", fontSize: "0.85rem", color: pt48.yhat >= 400 ? "var(--red-400)" : "var(--green-400)" }}>
+                 {pt48.yhat >= 400 ? "⚠️ Возможен паводок" : "✅ Стабильная обстановка"}
+               </div>
+            )}
+          </div>
+        </div>
+      )}
+      {forecast && (
+        <div style={{ marginTop: "16px", fontSize: "0.75rem", color: "var(--text-muted)", textAlign: "center" }}>
+          Последний расчёт: {formatDateTime(forecast.createdAt)}
         </div>
       )}
     </div>
@@ -695,9 +622,8 @@ export default function App() {
           compact
         />
         <HistoryChart readings={readings} />
-        <ForecastChart
+        <ForecastWidget
           forecast={forecast}
-          readings={readings}
           onRequest={handleRequestForecast}
           loading={forecastLoading}
         />
