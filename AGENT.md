@@ -19,6 +19,8 @@ You are a Lead Data Scientist. Your goal is to develop a high-precision flood le
 
 ## Workflow Requirements
 
+---
+
 1. Always start with EDA (Seasonality, Missing values, Outliers).
 2. Propose a Baseline, then an Advanced model (LSTM/Transformer/XGBoost).
 3. Use MAE/RMSE for regression and F1/ROC-AUC for classification.

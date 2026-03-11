@@ -46,15 +46,16 @@ export const chatRoutes = new Elysia({ prefix: "/api/chat" }).post(
 Исторический контекст: Самые разрушительные паводки фиксировались в 1966, 1988, 2005 и 2010 годах. Рекордные подъемы воды приводили к разрушению временных переправ и эвакуации сотен людей.`;
 
         try {
+            const ollamaUrl = process.env.OLLAMA_URL || "http://host.docker.internal:11434";
             const response = await fetch(
-                "http://localhost:11434/v1/chat/completions",
+                `${ollamaUrl}/v1/chat/completions`,
                 {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
                     },
                     body: JSON.stringify({
-                        model: "qwen-3:8b", // Using local Ollama model
+                        model: "qwen3:8b", // Using local Ollama model
                         messages: [
                             { role: "system", content: systemPrompt },
                             { role: "user", content: message },
