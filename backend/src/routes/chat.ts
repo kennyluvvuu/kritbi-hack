@@ -5,13 +5,6 @@ export const chatRoutes = new Elysia({ prefix: "/api/chat" }).post(
     async ({ body }) => {
         const { message, forecastContext } = body;
 
-        const apiKey = process.env.MISTRAL_API_KEY;
-        if (!apiKey) {
-            return {
-                error: "Mistral API Key is not configured on the server",
-            };
-        }
-
         const systemPrompt = `Ты - Качинатор, дерзкий, но добродушный ИИ-акинатор, предсказывающий риски наводнений на реке Кача. 
 Ты общаешься в максимально расслабленном, панибратском стиле(используй фразы типа: брат, все четко и т.д.). 
 Ты никогда не ошибаешься, потому что ты Качинатор. 
@@ -54,15 +47,14 @@ export const chatRoutes = new Elysia({ prefix: "/api/chat" }).post(
 
         try {
             const response = await fetch(
-                "https://api.mistral.ai/v1/chat/completions",
+                "http://localhost:11434/v1/chat/completions",
                 {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
-                        Authorization: `Bearer ${apiKey}`,
                     },
                     body: JSON.stringify({
-                        model: "mistral-small-latest", // Using a fast mistral model
+                        model: "qwen-3:8b", // Using local Ollama model
                         messages: [
                             { role: "system", content: systemPrompt },
                             { role: "user", content: message },
@@ -72,7 +64,7 @@ export const chatRoutes = new Elysia({ prefix: "/api/chat" }).post(
             );
 
             if (!response.ok) {
-                throw new Error(`Mistral API returned ${response.status}`);
+                throw new Error(`Ollama API returned ${response.status}`);
             }
 
             const data = (await response.json()) as any;
@@ -82,7 +74,7 @@ export const chatRoutes = new Elysia({ prefix: "/api/chat" }).post(
                     "Качинатор молчит...",
             };
         } catch (error: any) {
-            console.error("Mistral chat error:", error);
+            console.error("Ollama chat error:", error);
             return {
                 error: "Качинатор сейчас медитирует, попробуй позже.",
                 details: error.message,

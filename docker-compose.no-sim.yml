@@ -27,7 +27,6 @@ services:
             WARNING_LEVEL: ${WARNING_LEVEL}
             DANGER_LEVEL: ${DANGER_LEVEL}
             CRITICAL_LEVEL: ${CRITICAL_LEVEL}
-            MISTRAL_API_KEY: ${MISTRAL_API_KEY}
         depends_on:
             postgres:
                 condition: service_healthy
