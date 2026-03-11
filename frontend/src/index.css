@@ -137,7 +137,6 @@ body::after {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-left: 12px;
   padding: 4px 10px;
   background: rgba(59, 130, 246, 0.15);
   border: 1px solid rgba(59, 130, 246, 0.3);
@@ -149,8 +148,6 @@ body::after {
   color: var(--blue-400);
   text-decoration: none;
   transition: all 0.2s ease;
-  vertical-align: middle;
-  transform: translateY(-2px);
 }
 
 .telegram-badge:hover {
@@ -481,4 +478,105 @@ body::after {
   .header { flex-direction: column; gap: 12px; text-align: center; }
   .header h1 { font-size: 1.3rem; }
   .gauge-value { font-size: 2.5rem; }
+}
+
+/* ─── Footer ─────────────────────────────────────────── */
+
+.footer {
+  margin-top: 64px;
+  padding-top: 32px;
+  padding-bottom: 48px;
+  border-top: 1px solid var(--glass-border);
+  position: relative;
+}
+
+.footer-content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.footer-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.footer-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.footer-brand {
+  font-size: 0.9rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+  background: var(--gradient-blue);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.footer-divider {
+  width: 1px;
+  height: 14px;
+  background: var(--glass-border);
+}
+
+.footer-desc {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.footer-copyright {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.team-name {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.footer-bottom {
+  display: flex;
+  justify-content: center;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.footer-tagline {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  opacity: 0.6;
+}
+
+.heart-icon {
+  color: var(--red-400);
+  animation: heartBeat 2s infinite;
+}
+
+@keyframes heartBeat {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+@media (max-width: 768px) {
+  .footer-main {
+    flex-direction: column;
+    text-align: center;
+  }
+  .footer-info {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .footer-divider {
+    display: none;
+  }
 }
